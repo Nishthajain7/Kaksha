@@ -81,7 +81,7 @@ export default function Quiz() {
     return () => clearInterval(timer);
   }, []);
 
-  const formatTime = s =>
+  const formatTime = (s: number) =>
     `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(
       2,
       "0"
@@ -97,12 +97,9 @@ export default function Quiz() {
     <Box
       sx={{
         width: "100vw",
-        minHeight: "100vh",
-        bgcolor: "#F5F7FB",
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
-        position: "relative",
       }}
     >
   
@@ -110,8 +107,6 @@ export default function Quiz() {
         sx={{
           position: "absolute",
           top: 10,
-          left: "50%",
-          transform: "translateX(-50%)",
           bgcolor: "black",
           color: "white",
           px: 3,
@@ -127,7 +122,7 @@ export default function Quiz() {
         sx={{
           width: "70vw",
           maxWidth: 900,
-          maxHeight: "85vh",
+          maxHeight: 500,
           p: 4,
           borderRadius: 3,
           position: "relative",

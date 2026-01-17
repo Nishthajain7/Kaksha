@@ -6,6 +6,7 @@ import theme from "./theme";
 import ProtectedRoute from "./auth/ProtectedRoute";
 import { getUser } from "./auth/auth";
 import Quiz from "./pages/quiz";
+import File from "./pages/file"
 
 
 export default function App() {
@@ -40,7 +41,8 @@ export default function App() {
           <Route path="/dashboard" element={<Dashboard/>} />
           <Route path="/signin" element={<SignIn />} />
           <Route path="/quiz" element={<Quiz/>}/>
-        </Routes>
+          <Route path="/file" element={<File />} />
+          </Routes>
       </BrowserRouter>
     </ThemeProvider>
   );

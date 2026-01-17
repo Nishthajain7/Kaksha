@@ -8,11 +8,11 @@ export default function Dashboard() {
   return (
     <DashboardLayout>
       <Grid container spacing={2} >
-        <Grid item xs={12} md={6}>
+        <Grid item xs={12} md={5}>
           <NotesSection initialNotes={NOTES} />
         </Grid>
 
-        <Grid item xs={12} md={6}>
+        <Grid item xs={12} md={7}>
           <Box
             sx={{
               borderRadius: 2,

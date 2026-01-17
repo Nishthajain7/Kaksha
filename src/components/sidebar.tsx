@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import DashboardIcon from '@mui/icons-material/Dashboard';
-import PersonIcon from '@mui/icons-material/Person';
-import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
+import BackupIcon from '@mui/icons-material/Backup';
+import Book from '@mui/icons-material/Book';
 import LockIcon from '@mui/icons-material/Lock';
 import { useNavigate } from "react-router-dom";
 import {
@@ -29,8 +29,8 @@ export default function Sidebar() {
 
   const navItems = [
     { title: 'Dashboard', icon: DashboardIcon },
-    { title: 'Upload', icon: PersonIcon },
-    { title: 'Quizzes', icon: ShoppingCartIcon, badge: '+3' },
+    { title: 'Upload', icon: BackupIcon },
+    { title: 'Revisions', icon: Book, badge: '+3' },
     { title: 'Log out', icon: LockIcon },
   ];
 
@@ -87,7 +87,7 @@ export default function Sidebar() {
           }}
         >
           <ListItemIcon>
-            <PersonIcon />
+            <BackupIcon />
           </ListItemIcon>
           <ListItemText primary="Upload" />
         </ListItemButton>
@@ -100,9 +100,9 @@ export default function Sidebar() {
           }}
         >
           <ListItemIcon>
-            <ShoppingCartIcon />
+            <Book />
           </ListItemIcon>
-          <ListItemText primary="Quizzes" />
+          <ListItemText primary="Revisions" />
           <Chip label="+3" size="small" color="warning" />
         </ListItemButton>
       </List>

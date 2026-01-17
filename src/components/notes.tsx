@@ -117,9 +117,19 @@ export default function NotesSection({
       </Box>
 
       <Box sx={{ p: 2, textAlign: "right" }}>
-        <Button size="small" color="inherit">
+        <Button
+          // size="small"
+          color="inherit"
+          disableRipple
+          disableFocusRipple
+          sx={{
+            "&:focus": { outline: "none" },
+            "&.Mui-focusVisible": { outline: "none" },
+          }}
+        >
           View all
         </Button>
+
       </Box>
     </Card>
   );
