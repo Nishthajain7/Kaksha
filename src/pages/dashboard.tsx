@@ -7,7 +7,7 @@ import { NOTES } from "../assets/mockNotes";
 export default function Dashboard() {
   return (
     <DashboardLayout>
-      <Grid container spacing={3} >
+      <Grid container spacing={2} >
         <Grid item xs={12} md={6}>
           <NotesSection initialNotes={NOTES} />
         </Grid>
