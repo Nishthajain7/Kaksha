@@ -2,7 +2,6 @@ import DashboardLayout from "../layouts/dashboard";
 import NotesSection from "../components/notes";
 import Grid from "@mui/material/Grid";
 import { Box } from "@mui/material";
-import notes from "../components/notes";
 import { NOTES } from "../assets/mockNotes";
 
 export default function Dashboard() {
@@ -10,7 +9,7 @@ export default function Dashboard() {
     <DashboardLayout>
       <Grid container spacing={3} >
         <Grid item xs={12} md={6}>
-          <NotesSection notes={NOTES} />
+          <NotesSection initialNotes={NOTES} />
         </Grid>
 
         <Grid item xs={12} md={6}>

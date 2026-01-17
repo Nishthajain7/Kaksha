@@ -10,13 +10,6 @@ import {
 
 export default function SignIn() {
   return (
-    <Box
-      minHeight="100vh"
-      display="flex"
-      alignItems="center"
-      justifyContent="center"
-      bgcolor="#f5f5f5"
-    >
       <Card sx={{ width: 420 }}>
         <CardContent>
           <Typography variant="h5" fontWeight={600} mb={1}>
@@ -27,7 +20,7 @@ export default function SignIn() {
             Don’t have an account? <b>Get started</b>
           </Typography>
 
-          <Stack spacing={2}>
+          <Stack spacing={2}> 
             <TextField label="Email address" fullWidth />
             <TextField label="Password" type="password" fullWidth />
 
@@ -41,6 +34,5 @@ export default function SignIn() {
           </Stack>
         </CardContent>
       </Card>
-    </Box>
   );
 }

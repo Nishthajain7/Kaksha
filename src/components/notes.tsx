@@ -1,55 +1,53 @@
-import {
-  Box,
-  Card,
-  CardHeader,
-  CardProps,
-  Button,
-  List,
-  ListItem,
-  ListItemText,
-  Divider,
-  Link,
-  Typography,
-} from "@mui/material";
+import { Box, Card, CardHeader, CardProps, Button, List, ListItem, ListItemText, Divider, Link } from "@mui/material";
 import FolderIcon from "@mui/icons-material/Folder";
 import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile";
-import AddIcon from "@mui/icons-material/Add";
 import { NoteItem } from "../assets/mockNotes";
+import { useState } from "react";
 
 type NotesSectionProps = CardProps & {
   title?: string;
-  notes: NoteItem[];
+  initialNotes?: NoteItem[];
 };
 
 export default function NotesSection({
   title = "Notes",
-  notes,
+  initialNotes = [],
 }: NotesSectionProps) {
+  const [notes, setNotes] = useState<NoteItem[]>(initialNotes);
+
+  const now = () => new Date().toLocaleDateString();
+
   const handleFileSelect = (files: FileList | null) => {
     if (!files) return;
 
     const file = files[0];
 
-    console.log({
-      name: file.name,
-      size: file.size,
-      type: file.type,
-    });
+    const newNote: NoteItem = {
+      id: crypto.randomUUID(),
+      title: file.name,
+      description: `${(file.size / 1024).toFixed(1)} KB`,
+      type: "file",
+    };
+
+    setNotes((prev) => [newNote, ...prev]);
   };
+
   const handleFolderSelect = (files: FileList | null) => {
     if (!files) return;
+    const folderName =
+      (files[0] as any).webkitRelativePath?.split("/")[0] || "Folder";
+    const newNote: NoteItem = {
+      id: crypto.randomUUID(),
+      title: folderName,
+      description: `${files.length} items`,
+      type: "folder",
+    };
 
-    const folderFiles = Array.from(files);
-
-    console.log(
-      folderFiles.map((file) => ({
-        name: file.name,
-        path: (file as any).webkitRelativePath,
-      }))
-    );
+    setNotes((prev) => [newNote, ...prev]);
   };
+
   return (
-<Card sx={{ height: 320, display: "flex", flexDirection: "column" }}>
+    <Card sx={{ height: 320, display: "flex", flexDirection: "column" }}>
       <CardHeader
         title={title}
         action={
@@ -75,20 +73,14 @@ export default function NotesSection({
                 type="file"
                 multiple
                 onChange={(e) => handleFolderSelect(e.target.files)}
+                {...({ webkitdirectory: "", directory: "" } as any)}
               />
             </Button>
           </Box>
         }
       />
 
-      <Box
-    sx={{
-      flexGrow: 1,
-      overflowY: "auto",
-      scrollbarWidth: "thin",
-      scrollbarColor: "#e5e7eb transparent",
-    }}
-  >
+      <Box sx={{ flexGrow: 1, overflowY: "auto", scrollbarWidth: "thin", scrollbarColor: "#e5e7eb transparent", }}>
         <List disablePadding>
           {notes.map((note, index) => (
             <Box key={note.id}>
@@ -114,10 +106,6 @@ export default function NotesSection({
                   primaryTypographyProps={{ fontWeight: 500 }}
                   secondaryTypographyProps={{ noWrap: true }}
                 />
-
-                <Typography variant="caption" color="text.disabled">
-                  {note.updatedAt}
-                </Typography>
               </ListItem>
 
               {index < notes.length - 1 && (
