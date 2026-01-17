@@ -23,3 +23,26 @@ dist-ssr
 *.sln
 *.sw?
 .env
+
+# Python
+*.pyc
+__pycache__/
+.env
+.venv/
+env/
+venv/
+ENV/
+pip-log.txt
+pip-freeze.txt
+.python-version
+
+# Django
+*.log
+*.pot
+local_settings.py
+db.sqlite3
+media/
+
+# IDE/Editor specific files
+.idea/  # For PyCharm/IntelliJ
+.vscode/ # For VS Code
