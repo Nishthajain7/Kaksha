@@ -5,8 +5,8 @@ import SignIn from "./pages/auth";
 import theme from "./theme";
 import Quiz from "./pages/quiz";
 import File from "./pages/file"
-
 import { AuthProvider, useAuth } from "./Auth"; 
+import Upload from "./pages/uploads";
 
 function AppRoutes() {
   const { user, loading } = useAuth();
@@ -28,6 +28,10 @@ function AppRoutes() {
       <Route
         path="/dashboard"
         element={user ? <Dashboard /> : <Navigate to="/signin" />}
+      />
+      <Route 
+        path="/material" 
+        element={user ? <Upload /> : <Navigate to="/signin" />} 
       />
       <Route path="/signin" element={<SignIn />} />
       <Route 

@@ -29,7 +29,7 @@ export default function Sidebar() {
 
   const navItems = [
     { title: 'Dashboard', icon: DashboardIcon },
-    { title: 'Upload', icon: BackupIcon },
+    { title: 'Materials', icon: BackupIcon },
     { title: 'Revisions', icon: Book, badge: '+3' },
     { title: 'Log out', icon: LockIcon },
   ];
@@ -80,16 +80,16 @@ export default function Sidebar() {
         </ListItemButton>
 
         <ListItemButton
-          selected={active === "upload"}
+          selected={active === "material"}
           onClick={() => {
-            setActive("upload");
-            navigate("/upload");
+            setActive("material");
+            navigate("/material");
           }}
         >
           <ListItemIcon>
             <BackupIcon />
           </ListItemIcon>
-          <ListItemText primary="Upload" />
+          <ListItemText primary="Materials" />
         </ListItemButton>
 
         <ListItemButton
