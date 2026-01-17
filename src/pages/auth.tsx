@@ -8,30 +8,20 @@ import {
   Divider,
   Box,
 } from "@mui/material";
-import { GoogleLogin } from "@react-oauth/google";
-import { jwtDecode } from "jwt-decode";
-import { useNavigate } from "react-router-dom";
-
-type GoogleUser = {
-  name: string;
-  email: string;
-  picture: string;
-};
 
 export default function SignIn() {
-  const navigate = useNavigate();
-
-  const handleGoogleSuccess = (res: any) => {
-    if (!res.credential) return;
-    const decoded = jwtDecode<GoogleUser>(res.credential);
-    localStorage.setItem("auth_user", JSON.stringify(decoded));
-    navigate("/dashboard", { replace: true });
+  const handleGoogleLogin = () => {
+    window.location.href = "http://localhost:8000/accounts/google/login/";
   };
 
   return (
-    <Box sx={{width: "100vw",
+    <Box sx={{
+        width: "100vw",
         display: "flex",
-        justifyContent: "center",}}>
+        justifyContent: "center",
+        alignItems: "center",
+        height: "100vh"
+    }}>
     <Card sx={{ width: 420 }}>
       <CardContent>
         <Typography variant="h5" fontWeight={600} mb={1}>
@@ -52,7 +42,15 @@ export default function SignIn() {
 
           <Divider>or</Divider>
 
-          <GoogleLogin onSuccess={handleGoogleSuccess} />
+          <Button 
+            variant="outlined" 
+            fullWidth 
+            size="large" 
+            onClick={handleGoogleLogin}
+            sx={{ textTransform: 'none', color: 'black', borderColor: '#ccc' }}
+          >
+            Sign in with Google
+          </Button>
         </Stack>
       </CardContent>
     </Card>
