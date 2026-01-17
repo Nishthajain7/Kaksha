@@ -5,6 +5,7 @@ import SignIn from "./pages/auth";
 import theme from "./theme";
 import ProtectedRoute from "./auth/ProtectedRoute";
 import { getUser } from "./auth/auth";
+import Quiz from "./pages/quiz";
 
 
 export default function App() {
@@ -35,7 +36,10 @@ export default function App() {
             }
           />
 
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/dashboard" element={<Dashboard/>} />
           <Route path="/signin" element={<SignIn />} />
+          <Route path="/quiz" element={<Quiz/>}/>
         </Routes>
       </BrowserRouter>
     </ThemeProvider>
