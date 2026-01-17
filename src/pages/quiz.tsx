@@ -11,7 +11,7 @@ import { useState, useEffect } from "react";
 const questions = [
   {
     question: "Which language runs in the browser?",
-    options: ["C++", "Java", "JavaScript","JavaScript"],
+    options: ["C++", "Java", "JavaScript", "JavaScript"],
   },
   {
     question: "What does HTTP stand for?",
@@ -24,7 +24,7 @@ const questions = [
   },
   {
     question: "Which language runs in the browser?",
-    options: ["C++", "Java", "JavaScript","JavaScript"],
+    options: ["C++", "Java", "JavaScript", "JavaScript"],
   },
   {
     question: "What does HTTP stand for?",
@@ -37,7 +37,7 @@ const questions = [
   },
   {
     question: "Which language runs in the browser?",
-    options: ["C++", "Java", "JavaScript","JavaScript"],
+    options: ["C++", "Java", "JavaScript", "JavaScript"],
   },
   {
     question: "What does HTTP stand for?",
@@ -50,7 +50,7 @@ const questions = [
   },
   {
     question: "Which language runs in the browser?",
-    options: ["C++", "Java", "JavaScript","JavaScript"],
+    options: ["C++", "Java", "JavaScript", "JavaScript"],
   },
   {
     question: "What does HTTP stand for?",
@@ -65,11 +65,9 @@ const questions = [
 
 export default function Quiz() {
   const totalQ = questions.length;
-
   const [currQ, setCurrQ] = useState(0);
   const [ans, setAns] = useState(Array(totalQ).fill(null));
   const [timeLeft, setTimeLeft] = useState(totalQ * 60);
-
   const doneCount = ans.filter(a => a !== null).length;
   const progress = (doneCount / totalQ) * 100;
   const qData = questions[currQ];
@@ -90,27 +88,29 @@ export default function Quiz() {
   const handleSubmit = () => {
     if (!window.confirm("Submit test?")) return;
     console.log("Submitted answers:", ans);
-  
+
   };
 
   return (
     <Box
       sx={{
         width: "100vw",
+        minHeight: "100vh",
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
+        flexDirection: "column"
       }}
     >
-  
+
       <Box
         sx={{
-          position: "absolute",
-          top: 10,
+          top: 12,
+          mb: 2,
           bgcolor: "black",
           color: "white",
-          px: 3,
-          py: 1,
+          px: 2.5,
+          py: 0.75,
           borderRadius: 999,
           fontWeight: 600,
         }}
@@ -120,124 +120,122 @@ export default function Quiz() {
 
       <Card
         sx={{
-          width: "70vw",
-          maxWidth: 900,
-          maxHeight: 500,
-          p: 4,
-          borderRadius: 3,
-          position: "relative",
+          width: "100%",
+          maxWidth: 820,
+          p: 3,
+          display: "flex",
+          flexDirection: "column",
         }}
       >
-      <Box
-        display="flex"
-        flexDirection="row" 
-      >
-      <Box
-        display="flex"
-        flexDirection="column"     
-        alignItems="flex-start"     
-        gap={2}
-        mb={3}
-      >
-      <Typography color="text.secondary">
-          Question {currQ + 1} of {totalQ}
-      </Typography>
+        <Box display="flex" alignItems="center" mb={2}>
+          <Box>
+            <Typography variant="body2" color="text.secondary">
+              Question {currQ + 1} of {totalQ}
+            </Typography>
 
-      <Box display="flex" flexWrap="wrap" gap={1}>
-          {questions.map((_, i) => (
-            <Button
-              key={i}
-              size="small"
-              variant="contained"
-              color={ans[i] !== null ? "success" : "inherit"}
-              onClick={() => setCurrQ(i)}
-              sx={{ px: 2 }}
-            >
-              {i + 1}
-            </Button>
-          ))}
+            <Box display="flex" gap={0.75} mt={1}>
+              {questions.map((_, i) => (
+                <Button
+                  key={i}
+                  size="small"
+                  variant="contained"
+                  color={ans[i] !== null ? "success" : "inherit"}
+                  onClick={() => setCurrQ(i)}
+                  sx={{
+                    minWidth: 36,
+                    height: 32,
+                    fontSize: 12,
+                  }}
+                >
+                  {i + 1}
+                </Button>
+              ))}
+            </Box>
+          </Box>
+
+          <Box ml="auto">
+            <Box position="relative" display="inline-flex">
+              <CircularProgress
+                variant="determinate"
+                value={progress}
+                size={70}
+              />
+              <Box
+                sx={{
+                  position: "absolute",
+                  inset: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 14,
+                  fontWeight: 600,
+                }}
+              >
+                {doneCount}/{totalQ}
+              </Box>
+            </Box>
+          </Box>
         </Box>
-      </Box>
-      <Box sx={{ ml: "auto" }}>
-      <Box position="relative" display="inline-flex">
-        <CircularProgress
-          value={progress}
-          variant="determinate"
-          size={100}
-        />
-        <Box
-          sx={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            bottom: 0,
-            right: 0,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontWeight: 600,
-          }}
-        >
-          {doneCount}/{totalQ}
-        </Box>
-      </Box>
-    </Box>
 
-
-
-      </Box>
-      
-       <Typography variant="h5" fontWeight={600} mb={3}>
+        {/* Question */}
+        <Typography variant="h6" fontWeight={600} mb={2}>
           {qData.question}
         </Typography>
 
-        <Stack spacing={2} mb={4}>
+        {/* Options */}
+        <Stack spacing={1.5} mb={2}>
           {qData.options.map((opt, i) => (
             <Button
               key={i}
+              fullWidth
               variant={ans[currQ] === i ? "contained" : "outlined"}
               onClick={() => {
                 const copy = [...ans];
                 copy[currQ] = i;
                 setAns(copy);
               }}
-              sx={{ justifyContent: "flex-start", py: 2 }}
+              sx={{
+                justifyContent: "flex-start",
+                py: 1.2,
+                fontSize: 14,
+              }}
             >
               {String.fromCharCode(65 + i)}. {opt}
             </Button>
           ))}
         </Stack>
 
-        <Box display="flex" justifyContent="space-between" alignItems="center">
+        {/* Footer */}
+        <Box
+          mt="auto"
+          display="flex"
+          justifyContent="space-between"
+          alignItems="center"
+        >
           <Button
+            size="small"
             disabled={currQ === 0}
             onClick={() => setCurrQ(q => q - 1)}
           >
             Prev
           </Button>
 
-          <Button color="error">Exit</Button>
+          <Button size="small" color="error">
+            Exit
+          </Button>
 
           {currQ === totalQ - 1 ? (
             <Button
               color="success"
               variant="contained"
-              disabled={currQ != totalQ-1}
+              disabled={currQ != totalQ - 1}
               onClick={handleSubmit}
             >
               Submit
             </Button>
           ) : (
             <Button
-            sx={{
-              '&:focus': {
-                outline: 'none',
-                border: 'none',
-              },
-              '&:focus-visible': {
-                outline: 'none',
-              },
-            }}
+              size="small"
               variant="contained"
               onClick={() => setCurrQ(q => q + 1)}
             >
