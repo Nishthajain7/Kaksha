@@ -8,6 +8,11 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
 from rest_framework import status
 from .models import Concept,File,Folder
+from googleapiclient.discovery import build
+from google.oauth2.credentials import Credentials
+from allauth.socialaccount.models import SocialToken
+from django.utils import timezone
+from datetime import timedelta
 
 def auth(request):
     if request.user.is_authenticated:
@@ -34,6 +39,9 @@ def folderUpload(request, folder_name):
 
     return Response({"folder_id": folder.folder_id}, status=201)
 
+import json
+from django.db import transaction
+
 @api_view(["POST"])
 def fileUpload(request, folder_name):
     if not request.user.is_authenticated:
@@ -44,33 +52,120 @@ def fileUpload(request, folder_name):
     except Folder.DoesNotExist:
         return Response({"error": "Folder not found"}, status=404)
 
+    # 1. Save the file record first
     file_name = request.data.get("file_name")
     file_path = request.data.get("path")
+    
+    try:
+        with transaction.atomic():
+            # Create the file in DB
+            new_file = File.objects.create(
+                file_name=file_name,
+                path=file_path,
+                folder=folder
+            )
 
-    file = File.objects.create(
-        file_name=file_name,
-        path=file_path,
-        folder=folder
-    )
-    return Response({"file_id": file.file_id}, status=201)
+            # 2. Call OCRExtractView internally
+            # We pass the current request which contains the 'file'
+            ocr_response = OCRExtractView.as_view()(request._request)
+            if ocr_response.status_code != 200:
+                raise Exception("OCR Step Failed")
+            
+            extracted_text = ocr_response.data.get("text")
 
+            # 3. Call KeyPointsView internally
+            # We must update the request data to pass the 'text' forward
+            request.data['text'] = extracted_text
+            kp_response = KeyPointsView.as_view()(request._request)
+            
+            if kp_response.status_code != 200:
+                raise Exception("Concept Extraction Failed")
 
-def accuracy(request):
+            # KeyPointsView returns a string of JSON, so we parse it
+            raw_kp_content = kp_response.data.get("key_points")
+            concepts_data = json.loads(raw_kp_content)
+
+            # 4. Save Concepts to Database
+            for name in concepts_data.get("concepts", []):
+                Concept.objects.create(
+                    file=new_file,
+                    concept_name=name
+                )
+
+            return Response({
+                "status": "success",
+                "file_id": new_file.file_id,
+                "concepts_found": len(concepts_data.get("concepts", []))
+            }, status=201)
+
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+
+from django.utils import timezone
+from datetime import timedelta
+from django.http import JsonResponse
+from .models import Concept
+
+def submit_quiz_result(request):
+    # Standard authentication check
     if not request.user.is_authenticated:
         return JsonResponse({"error": "Unauthorized"}, status=401)
 
-    # This filters: Concepts -> File -> Folder -> User
-    concepts = Concept.objects.filter(file__folder__user=request.user)
-    
-    result = []
-    for c in concepts:
-         total = (c.correct or 0) + (c.wrong or 0)
-         acc = (c.correct / total) if total > 0 else 0
-         result.append({
-            "concept_name": c.concept_name,
-            "accuracy": round(acc, 2)
-        })
-    return JsonResponse(result, safe=False)
+    if request.method == 'POST':
+        concept_id = request.POST.get("concept_id")
+        quality = int(request.POST.get("quality", 0)) # Score 0-5
+
+        try:
+            # Securely get the concept belonging to the logged-in user
+            concept = Concept.objects.get(
+                concept_id=concept_id, 
+                file__folder__user=request.user
+            )
+
+            # --- 1. Update Basic Accuracy Stats ---
+            if quality >= 3:
+                concept.correct += 1
+            else:
+                concept.wrong += 1
+            
+            # --- 2. Apply your SM2 Algorithm Logic ---
+            # Using your variable names: repetitions, interval, easiness_factor
+            reps = concept.repetitions
+            interval = concept.interval
+            ef = concept.easiness_factor
+
+            if quality >= 3:  # Correct response
+                if reps == 0:
+                    interval = 1
+                elif reps == 1:
+                    interval = 6
+                else:
+                    interval = round(interval * ef)
+                reps += 1
+            else:  # Incorrect response
+                reps = 0
+                interval = 1
+
+            # Calculate new Easiness Factor
+            ef = ef + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02))
+            if ef < 1.3:
+                ef = 1.3
+
+            # --- 3. Save Updated Values & Schedule ---
+            concept.repetitions = reps
+            concept.interval = interval
+            concept.easiness_factor = ef
+            # Set the next review date based on the new interval
+            concept.next_review = timezone.now() + timedelta(days=interval)
+            
+            concept.save()
+
+            return JsonResponse({"status": "OK"})
+
+        except Concept.DoesNotExist:
+            return JsonResponse({"error": "Concept not found"}, status=404)
+
+    return JsonResponse({"error": "Invalid request method"}, status=405)
 
 
 OCR_URL = "https://api.ocr.space/parse/image"
@@ -192,59 +287,223 @@ Text:
         )
 
 class QuizGenerationView(APIView):
-
     def post(self, request):
-        serializer = QuizRequestSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        # We now expect file_id (and optionally folder_id for security)
+        file_id = request.data.get("file_id")
+        num_questions = request.data.get("num_questions", 5)
 
-        text = serializer.validated_data["text"]
-        num_questions = serializer.validated_data["num_questions"]
-        concepts = serializer.validated_data.get("concepts")
+        if not file_id:
+            return Response({"error": "file_id is required"}, status=400)
 
-        concept_clause = ""
-        if concepts:
-            concept_clause = f"Focus specially on {', '.join(concepts)}."
+        try:
+            # 1. Fetch the File and its extracted concepts from the DB
+            # Security: Ensure the file belongs to the logged-in user
+            file_obj = File.objects.get(file_id=file_id, folder__user=request.user)
+            
+            # Get all concept names for this file
+            db_concepts = Concept.objects.filter(file=file_obj).values_list('concept_name', flat=True)
+            
+            if not db_concepts:
+                return Response({"error": "No concepts found for this file. Upload the file first."}, status=404)
 
-        prompt = f"""
-Generate {num_questions} multiple-choice questions.
+            # 2. Reconstruct the prompt using the database concepts
+            concept_clause = f"Focus strictly on these extracted concepts: {', '.join(db_concepts)}."
+
+            # Note: You'll need the text from the file. 
+            # If you saved the OCR text in the File model earlier, use that.
+            # If not, you might need to pass the text in the request or fetch from S3/Path.
+            text_content = request.data.get("text") # Fallback if text is sent from frontend
+
+            prompt = f"""
+Generate {num_questions} multiple-choice questions based on the provided content.
 {concept_clause}
 
 Content:
-{text}
+{text_content}
 
 Output ONLY valid JSON:
 {{
   "questions": [
     {{
       "question": "...",
-      "options": ["A", "B", "C", "D"],
+      "options": ["Option A", "Option B", "Option C", "Option D"],
       "correct_answer": 0,
-      "concept": "Concept name"
+      "concept": "One of the provided concepts"
     }}
   ]
 }}
 """
 
-        response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are a quiz generation expert. Always respond with valid JSON only."
-                },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
-            response_format={"type": "json_object"},
-            temperature=0.7,
-            max_tokens=2000
+            response = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[
+                    {"role": "system", "content": "You are a quiz generation expert. Respond with valid JSON only."},
+                    {"role": "user", "content": prompt}
+                ],
+                response_format={"type": "json_object"},
+                temperature=0.7,
+            )
+
+            return Response(json.loads(response.choices[0].message.content), status=200)
+
+        except File.DoesNotExist:
+            return Response({"error": "File not found or unauthorized"}, status=404)
+
+from googleapiclient.discovery import build
+from google.oauth2.credentials import Credentials
+from allauth.socialaccount.models import SocialToken, SocialAccount
+from django.http import JsonResponse
+import urllib.parse
+from django.http import JsonResponse
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
+from allauth.socialaccount.models import SocialAccount, SocialToken
+import os
+
+import urllib.parse  # <--- Add this import
+from googleapiclient.discovery import build
+from google.oauth2.credentials import Credentials
+
+@api_view(["GET"])
+def dashboard_view(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "Unauthorized"}, status=401)
+
+    user = request.user
+    social_account = SocialAccount.objects.filter(user=user, provider="google").first()
+    extra_data = social_account.extra_data if social_account else {}
+    photo_url = extra_data.get("picture")
+
+    folder_list = [{"id": f.folder_id, "name": f.folder_name} for f in user.folders.all()]
+    calendar_url = None
+
+    try:
+        token_obj = SocialToken.objects.get(account__user=user, account__provider="google")
+
+        creds = Credentials(
+            token=token_obj.token,
+            refresh_token=token_obj.token_secret,
+            token_uri="https://oauth2.googleapis.com/token",
+            client_id=os.getenv("GOOGLE_CLIENT_ID"),
+            client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
         )
 
-        quiz_json = response.choices[0].message.content
+        service = build("calendar", "v3", credentials=creds)
+        
+        # Get list of calendars
+        calendar_list = service.calendarList().list().execute()
+        kaksha_calendar_id = None
 
-        return Response(
-            quiz_json,
-            status=status.HTTP_200_OK
-        )
+        for entry in calendar_list.get("items", []):
+            if entry.get("summary") == "Kaksha Schedule":
+                kaksha_calendar_id = entry["id"]
+                break
+
+        if not kaksha_calendar_id:
+            # Create if not exists
+            created_calendar = service.calendars().insert(
+                body={"summary": "Kaksha Schedule", "timeZone": "Asia/Kolkata"}
+            ).execute()
+            kaksha_calendar_id = created_calendar["id"]
+
+            # 🔥 MAKE IT PUBLIC so the iframe doesn't 401
+            try:
+                service.acl().insert(
+                    calendarId=kaksha_calendar_id,
+                    body={"role": "reader", "scope": {"type": "default"}}
+                ).execute()
+            except Exception as acl_e:
+                print(f"ACL Error (usually fine if already public): {acl_e}")
+
+        # Encode ID for the URL
+        encoded_id = urllib.parse.quote(kaksha_calendar_id)
+        calendar_url = f"https://calendar.google.com/calendar/embed?src={encoded_id}&ctz=Asia%2FKolkata"
+
+    except Exception as e:
+        print("Calendar logic error:", e)
+        # Fallback to primary calendar if logic fails
+        encoded_email = urllib.parse.quote(user.email)
+        calendar_url = f"https://calendar.google.com/calendar/embed?src={encoded_email}&ctz=Asia%2FKolkata"
+
+    return JsonResponse({
+        "status": "success",
+        "first_name": user.first_name,
+        "photo": photo_url,
+        "folders": folder_list,
+        "calendar_url": calendar_url,
+    })
+
+def calculate_sm2(quality, repetitions, interval, easiness_factor):
+    """
+    quality: 0-5 (0=blackout, 5=perfect)
+    repetitions: current success streak
+    interval: current interval in days
+    easiness_factor: current EF
+    """
+    if quality >= 3:  # Correct answer
+        if repetitions == 0:
+            interval = 1
+        elif repetitions == 1:
+            interval = 6
+        else:
+            interval = round(interval * easiness_factor)
+        
+        repetitions += 1
+    else:  # Incorrect answer
+        repetitions = 0
+        interval = 1
+
+    # Calculate new Easiness Factor
+    easiness_factor = easiness_factor + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02))
+    if easiness_factor < 1.3:
+        easiness_factor = 1.3
+
+    return repetitions, interval, easiness_factor
+
+from django.http import JsonResponse
+from .models import Folder, File, Concept
+
+def folder_full_detail(request, folder_id):
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "Unauthorized"}, status=401)
+
+    try:
+        # 1. Security check: Ensure the folder belongs to the user
+        folder = Folder.objects.get(folder_id=folder_id, user=request.user)
+        
+        # 2. Get all files in this folder
+        files = File.objects.filter(folder=folder)
+        
+        folder_data = {
+            "folder_name": folder.folder_name,
+            "files": []
+        }
+
+        for f in files:
+            # 3. Get all concepts for each file
+            concepts = Concept.objects.filter(file=f)
+            
+            concept_list = []
+            for c in concepts:
+                # Calculate accuracy for display
+                total = (c.correct or 0) + (c.wrong or 0)
+                accuracy = round((c.correct / total), 2) if total > 0 else 0
+                
+                concept_list.append({
+                    "concept_id": c.concept_id,
+                    "name": c.concept_name,
+                    "accuracy": accuracy,
+                    "next_review": c.next_review.strftime("%Y-%m-%d"),
+                    "repetitions": c.repetitions
+                })
+
+            folder_data["files"].append({
+                "file_id": f.file_id,
+                "file_name": f.file_name,
+                "concepts": concept_list
+            })
+
+        return JsonResponse(folder_data)
+
+    except Folder.DoesNotExist:
+        return JsonResponse({"error": "Folder not found"}, status=404)

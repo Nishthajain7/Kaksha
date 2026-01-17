@@ -1,3 +1,4 @@
+from django.utils import timezone
 from django.db import models
 from django.conf import settings # Crucial for referencing the User
 
@@ -32,7 +33,12 @@ class Concept(models.Model):
     concept_name = models.CharField(max_length=255)
     correct = models.IntegerField(default=0)
     wrong = models.IntegerField(default=0)
+    easiness_factor = models.FloatField(default=2.5)
+    interval = models.IntegerField(default=0) 
+    repetitions = models.IntegerField(default=0)
+    next_review = models.DateTimeField(default=timezone.now)
 
     class Meta:
         managed = True
         db_table = 'concept'
+
