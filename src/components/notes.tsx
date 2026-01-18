@@ -110,7 +110,6 @@ export default function NotesSection({
         </List>
       </Box>
 
-      {/* FOOTER — EXACT */}
       <Box sx={{ p: 2, textAlign: "right" }}>
         <Button
           color="inherit"

@@ -119,66 +119,92 @@ from datetime import timedelta
 from django.http import JsonResponse
 from .models import Concept
 
+import json
+from collections import defaultdict
+from django.http import JsonResponse
+from django.utils import timezone
+from datetime import timedelta
+
 def submit_quiz_result(request):
-    # Standard authentication check
     if not request.user.is_authenticated:
         return JsonResponse({"error": "Unauthorized"}, status=401)
 
-    if request.method == 'POST':
-        concept_id = request.POST.get("concept_id")
-        quality = int(request.POST.get("quality", 0)) # Score 0-5
+    if request.method != "POST":
+        return JsonResponse({"error": "Invalid request method"}, status=405)
 
+    try:
+        body = json.loads(request.body)
+        results = body.get("results", [])
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    if not results:
+        return JsonResponse({"error": "No quiz results provided"}, status=400)
+
+    grouped = defaultdict(list)
+    for r in results:
+        grouped[r["concept_id"]].append(r["result"])
+
+    next_review_days = []
+
+    for concept_id, attempts in grouped.items():
         try:
-            # Securely get the concept belonging to the logged-in user
             concept = Concept.objects.get(
-                concept_id=concept_id, 
+                concept_id=concept_id,
                 file__folder__user=request.user
             )
-
-            # --- 1. Update Basic Accuracy Stats ---
-            if quality >= 3:
-                concept.correct += 1
-            else:
-                concept.wrong += 1
-            
-            # --- 2. Apply your SM2 Algorithm Logic ---
-            # Using your variable names: repetitions, interval, easiness_factor
-            reps = concept.repetitions
-            interval = concept.interval
-            ef = concept.easiness_factor
-
-            if quality >= 3:  # Correct response
-                if reps == 0:
-                    interval = 1
-                elif reps == 1:
-                    interval = 6
-                else:
-                    interval = round(interval * ef)
-                reps += 1
-            else:  # Incorrect response
-                reps = 0
-                interval = 1
-
-            # Calculate new Easiness Factor
-            ef = ef + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02))
-            if ef < 1.3:
-                ef = 1.3
-
-            # --- 3. Save Updated Values & Schedule ---
-            concept.repetitions = reps
-            concept.interval = interval
-            concept.easiness_factor = ef
-            # Set the next review date based on the new interval
-            concept.next_review = timezone.now() + timedelta(days=interval)
-            
-            concept.save()
-
-            return JsonResponse({"status": "OK"})
-
         except Concept.DoesNotExist:
-            return JsonResponse({"error": "Concept not found"}, status=404)
+            continue 
 
-    return JsonResponse({"error": "Invalid request method"}, status=405)
+        correct = attempts.count("correct")
+        wrong = attempts.count("wrong")
+        skipped = attempts.count("skipped")
+
+        concept.correct += correct
+        concept.wrong += wrong
+
+        if correct > wrong:
+            quality = 5
+        elif skipped > 0:
+            quality = 2
+        else:
+            quality = 1
+
+        reps = concept.repetitions
+        interval = concept.interval
+        ef = concept.easiness_factor
+
+        if quality >= 3:
+            if reps == 0:
+                interval = 1
+            elif reps == 1:
+                interval = 6
+            else:
+                interval = round(interval * ef)
+            reps += 1
+        else:
+            reps = 0
+            interval = 1
+
+        ef = ef + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02))
+        if ef < 1.3:
+            ef = 1.3
+
+        concept.repetitions = reps
+        concept.interval = interval
+        concept.easiness_factor = ef
+        concept.next_review = timezone.now() + timedelta(days=interval)
+        concept.save()
+
+        next_review_days.append(interval)
+
+    next_quiz_in_days = min(next_review_days) if next_review_days else 1
+
+    return JsonResponse({
+        "status": "OK",
+        "next_quiz": next_quiz_in_days
+    })
+
 
 
 OCR_URL = "https://api.ocr.space/parse/image"
@@ -328,20 +354,35 @@ class QuizGenerationView(APIView):
             text_content = request.data.get("text") # Fallback if text is sent from frontend
 
             prompt = f"""
-Generate {num_questions} multiple-choice questions based on the provided content.
-{concept_clause}
+You are an exam question generator.
 
-Content:
-{text_content}
+Generate 10 high-quality multiple-choice questions strictly based on the given concepts.
 
-Output ONLY valid JSON:
+Concepts:
+{db_concepts}
+
+Rules:
+- Each question must clearly relate to ONE of the provided concepts
+- Provide exactly 4 options per question
+- Only ONE option must be correct
+- Use 0-based indexing for the correct answer
+- The "concept" field must exactly match one of the given concepts
+- Do NOT add explanations or extra text
+
+Output ONLY valid JSON in the following format:
+
 {{
   "questions": [
     {{
-      "question": "...",
-      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "question": "Question text here",
+      "options": [
+        "Option A",
+        "Option B",
+        "Option C",
+        "Option D"
+      ],
       "correct_answer": 0,
-      "concept": "One of the provided concepts"
+      "concept": "Exact concept name it is realted to, Each question must clearly relate to ONE of the provided concepts"
     }}
   ]
 }}
@@ -419,7 +460,6 @@ def dashboard_view(request):
             ).execute()
             kaksha_calendar_id = created_calendar["id"]
 
-            # 🔥 MAKE IT PUBLIC so the iframe doesn't 401
             try:
                 service.acl().insert(
                     calendarId=kaksha_calendar_id,
@@ -453,7 +493,7 @@ def calculate_sm2(quality, repetitions, interval, easiness_factor):
     interval: current interval in days
     easiness_factor: current EF
     """
-    if quality >= 3:  # Correct answer
+    if quality >= 3:
         if repetitions == 0:
             interval = 1
         elif repetitions == 1:
