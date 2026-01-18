@@ -13,6 +13,14 @@ from google.oauth2.credentials import Credentials
 from allauth.socialaccount.models import SocialToken
 from django.utils import timezone
 from datetime import timedelta
+from django.views.decorators.csrf import csrf_exempt
+from rest_framework.decorators import permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.authentication import SessionAuthentication, BasicAuthentication
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
+from rest_framework.authentication import SessionAuthentication
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 
 def auth(request):
     if request.user.is_authenticated:
@@ -26,8 +34,13 @@ def auth(request):
         })
     return JsonResponse({"isLoggedIn": False}, status=401)
 
+class UnsafeSessionAuthentication(SessionAuthentication):
+    def enforce_csrf(self, request):
+        return
 
 @api_view(["POST"])
+@authentication_classes([UnsafeSessionAuthentication])
+@permission_classes([IsAuthenticated])
 def folderUpload(request, folder_name):
     if not request.user.is_authenticated:
         return Response({"error": "Login required"}, status=401)

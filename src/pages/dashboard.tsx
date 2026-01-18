@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import DashboardLayout from "../layouts/dashboard";
 import NotesSection from "../components/notes";
 import Grid from "@mui/material/Grid";
@@ -10,56 +11,81 @@ import {
   CardContent,
   TextField,
   Button,
+  Stack,
 } from "@mui/material";
 import axios from "axios";
+
+interface Folder {
+  id: number;
+  name: string;
+}
 
 interface DashboardData {
   first_name: string;
   photo: string;
-  folders: any[];
+  folders: Folder[];
   calendar_url: string;
 }
 
+/* Axios global config */
 axios.defaults.withCredentials = true;
 axios.defaults.baseURL = "http://localhost:8000";
+axios.defaults.xsrfCookieName = "csrftoken";
+axios.defaults.xsrfHeaderName = "X-CSRFToken";
 
 export default function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [newFolderName, setNewFolderName] = useState("");
+  const [creating, setCreating] = useState(false);
 
-  useEffect(() => {
+  const navigate = useNavigate();
+
+  /* Fetch dashboard data */
+  const fetchDashboard = () => {
     axios
       .get("/api/dashboard/")
-      .then((res) => {
-        console.log("Dashboard Data Received:", res.data);
-        console.log("Calendar URL:", res.data.calendar_url);
-        console.log("Folders Count:", res.data.folders?.length);
-        setData(res.data);
-      })
+      .then((res) => setData(res.data))
       .catch((err) => {
-        console.error("Dashboard fetch error:", err);
         if (err.response?.status === 401) {
           window.location.href = "/login";
         }
       })
-      .finally(() => {
-        setLoading(false);
-      });
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchDashboard();
   }, []);
+
+  /* Create folder (backend expects name only) */
+  const handleCreateFolder = async () => {
+    const name = newFolderName.trim();
+    if (!name) return;
+
+    setCreating(true);
+    try {
+      await axios.post(`/api/folderUpload/${encodeURIComponent(name)}/`);
+      // Hard reload to guarantee fresh state from backend
+      window.location.reload();
+    } catch (err: any) {
+      alert(err.response?.data?.error || "Error creating folder");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      handleCreateFolder();
+    }
+  };
 
   if (loading) {
     return (
       <DashboardLayout>
-        <Box
-          sx={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            mt: 10,
-          }}
-        >
+        <Box sx={{ display: "flex", justifyContent: "center", mt: 10 }}>
           <CircularProgress />
-          <Typography sx={{ mt: 2 }}>Loading Dashboard...</Typography>
         </Box>
       </DashboardLayout>
     );
@@ -68,34 +94,62 @@ export default function Dashboard() {
   return (
     <DashboardLayout>
       <Grid container spacing={2}>
+        {/* LEFT SIDE */}
         <Grid item xs={12} md={6}>
-          <NotesSection initialNotes={data?.folders || []} />
+          {/* CREATE FOLDER */}
+          <Card sx={{ mb: 2 }}>
+            <CardContent>
+              <Typography variant="h6" fontWeight={600} mb={1}>
+                Create New Folder
+              </Typography>
 
+              <Stack direction="row" spacing={1}>
+                <TextField
+                  label="Folder Name"
+                  size="small"
+                  fullWidth
+                  value={newFolderName}
+                  onChange={(e) => setNewFolderName(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  disabled={creating}
+                />
+                <Button
+                  variant="contained"
+                  onClick={handleCreateFolder}
+                  disabled={creating}
+                >
+                  {creating ? "Creating..." : "Create"}
+                </Button>
+              </Stack>
+            </CardContent>
+          </Card>
+
+          {/* FOLDERS LIST */}
+          <NotesSection
+            initialNotes={data?.folders || []}
+            onFolderClick={(id: number) => navigate(`/upload/${id}`)}
+          />
+
+          {/* YOUTUBE CARD */}
           <Card sx={{ mt: 2 }}>
             <CardContent>
               <Typography variant="h6" fontWeight={600} mb={1}>
-                Add YouTube Learning Resource
+                YouTube Resource
               </Typography>
-
-              <Typography variant="body2" color="text.secondary" mb={2}>
-                Paste a YouTube video link to generate notes or quiz questions
-              </Typography>
-
               <TextField
                 label="YouTube URL"
-                placeholder="https://www.youtube.com/watch?v=xxxx"
                 fullWidth
-                type="url"
+                size="small"
                 sx={{ mb: 2 }}
               />
-
-              <Button variant="contained" size="large" fullWidth>
+              <Button variant="contained" fullWidth>
                 Generate Quiz
               </Button>
             </CardContent>
           </Card>
         </Grid>
 
+        {/* RIGHT SIDE – GOOGLE CALENDAR (UNCHANGED) */}
         <Grid item xs={12} md={6}>
           <Box
             sx={{
@@ -103,7 +157,6 @@ export default function Dashboard() {
               overflow: "hidden",
               border: "1px solid #eee",
               height: 510,
-              bgcolor: "#f9f9f9"
             }}
           >
             {data?.calendar_url ? (
@@ -115,8 +168,17 @@ export default function Dashboard() {
                 title="Google Calendar"
               />
             ) : (
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-                 <Typography color="text.secondary">Calendar not available</Typography>
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  height: "100%",
+                }}
+              >
+                <Typography color="text.secondary">
+                  Calendar not available
+                </Typography>
               </Box>
             )}
           </Box>

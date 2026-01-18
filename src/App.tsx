@@ -6,6 +6,14 @@ import theme from "./theme";
 import Quiz from "./pages/quiz";
 import File from "./pages/file"
 
+import axios from "axios";
+
+axios.defaults.baseURL = "http://localhost:8000";
+axios.defaults.withCredentials = true;
+axios.defaults.xsrfCookieName = "csrftoken";
+axios.defaults.xsrfHeaderName = "X-CSRFToken";
+
+
 import { AuthProvider, useAuth } from "./Auth"; 
 
 function AppRoutes() {
