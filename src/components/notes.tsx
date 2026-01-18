@@ -12,7 +12,6 @@ import {
 } from "@mui/material";
 import FolderIcon from "@mui/icons-material/Folder";
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 
 type Folder = {
   id: number;
@@ -22,15 +21,17 @@ type Folder = {
 type NotesSectionProps = CardProps & {
   title?: string;
   initialNotes?: Folder[];
+  onFolderClick?: (id: number) => void;
 };
+
 
 export default function NotesSection({
   title = "Notes",
   initialNotes = [],
+  onFolderClick,
   ...cardProps
 }: NotesSectionProps) {
   const [folders, setFolders] = useState<Folder[]>([]);
-  const navigate = useNavigate();
 
   useEffect(() => {
     setFolders(initialNotes);
@@ -75,7 +76,7 @@ export default function NotesSection({
                   gap: 2,
                   cursor: "pointer",
                 }}
-                onClick={() => navigate(`/upload/${folder.id}`)}
+                onClick={() => onFolderClick?.(folder.id)}
               >
                 {/* ICON — EXACT */}
                 <Box

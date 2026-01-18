@@ -14,10 +14,13 @@ axios.defaults.xsrfCookieName = "csrftoken";
 axios.defaults.xsrfHeaderName = "X-CSRFToken";
 
 
-import { AuthProvider, useAuth } from "./Auth"; 
+import { AuthProvider, useAuth } from "./Auth";
+import Auth from "./pages/auth";
+import { ProtectedRoute, PublicRoute } from "./RouteGuards";
+import Upload from "./pages/upload/[id]";
 
 function AppRoutes() {
-  const { user, loading } = useAuth();
+  const { loading } = useAuth();
 
   if (loading) {
     return (
@@ -29,23 +32,49 @@ function AppRoutes() {
 
   return (
     <Routes>
+      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+
       <Route
-        path="/"
-        element={user ? <Navigate to="/dashboard" /> : <Navigate to="/signin" />}
+        path="/signin"
+        element={
+          <PublicRoute>
+            <Auth />
+          </PublicRoute>
+        }
       />
+
       <Route
         path="/dashboard"
-        element={user ? <Dashboard /> : <Navigate to="/signin" />}
+        element={
+          <ProtectedRoute>
+            <Dashboard />
+          </ProtectedRoute>
+        }
       />
-      <Route path="/signin" element={<SignIn />} />
-      <Route 
-        path="/quiz" 
-        element={user ? <Quiz /> : <Navigate to="/signin" />} 
+
+      <Route
+        path="/upload/:id"
+        element={
+          <ProtectedRoute>
+            <Upload />
+          </ProtectedRoute>
+        }
       />
-      <Route path="*" element={<Navigate to="/" />} />
+
+      <Route
+        path="/quiz"
+        element={
+          <ProtectedRoute>
+            <Quiz />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
+
 
 export default function App() {
   return (

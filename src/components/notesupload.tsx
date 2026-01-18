@@ -15,10 +15,12 @@ import FolderIcon from "@mui/icons-material/Folder";
 import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile";
 import { NoteItem } from "../assets/mockNotes";
 import { useState } from "react";
+import axios from "axios";
 
 type NotesSectionProps = CardProps & {
   title?: string;
   initialNotes?: NoteItem[];
+  folderName: string;
 };
 
 
@@ -27,8 +29,7 @@ type NoteWithDate = NoteItem & {
 };
 
 export default function NotesSection({
-  title = "Notes",
-  initialNotes = [],
+  initialNotes = [], folderName
 }: NotesSectionProps) {
   const now = () => new Date().toLocaleDateString();
 
@@ -39,38 +40,51 @@ export default function NotesSection({
     }))
   );
 
-  const handleFileSelect = (files: FileList | null) => {
+  const handleFileSelect = async (files: FileList | null) => {
     if (!files) return;
+    if (!folderName) {
+      alert("Folder not loaded yet");
+      return;
+    }
 
     const file = files[0];
 
-    const newNote: NoteWithDate = {
-      id: crypto.randomUUID(),
-      title: file.name,
-      description: `${(file.size / 1024).toFixed(1)} KB`,
-      type: "file",
-      nextQuizDate: now(),
-    };
+    try {
+      await uploadFileToBackend(file);
 
-    setNotes((prev) => [newNote, ...prev]);
+      const newNote: NoteWithDate = {
+        id: crypto.randomUUID(),
+        title: file.name,
+        description: `${(file.size / 1024).toFixed(1)} KB`,
+        type: "file",
+        nextQuizDate: now(),
+      };
+
+      setNotes((prev) => [newNote, ...prev]);
+    } catch (err) {
+      alert("File upload failed");
+    }
   };
 
-  const handleFolderSelect = (files: FileList | null) => {
-    if (!files) return;
 
-    const folderName =
-      (files[0] as any).webkitRelativePath?.split("/")[0] || "Folder";
+  const uploadFileToBackend = async (file: File) => {
+    const formData = new FormData();
 
-    const newNote: NoteWithDate = {
-      id: crypto.randomUUID(),
-      title: folderName,
-      description: `${files.length} items`,
-      type: "folder",
-      nextQuizDate: now(), 
-    };
+    formData.append("file", file);
+    formData.append("file_name", file.name);
+    formData.append("path", file.webkitRelativePath || file.name);
 
-    setNotes((prev) => [newNote, ...prev]);
+    await axios.post(
+      `/api/fileUpload/${encodeURIComponent(folderName)}/`,
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
   };
+
 
   return (
     <Card
@@ -82,7 +96,6 @@ export default function NotesSection({
       }}
     >
       <CardHeader
-        title={title}
         action={
           <Box sx={{ display: "flex", gap: 1 }}>
             <Button size="small" startIcon="+" component="label">
@@ -91,17 +104,6 @@ export default function NotesSection({
                 hidden
                 type="file"
                 onChange={(e) => handleFileSelect(e.target.files)}
-              />
-            </Button>
-
-            <Button size="small" startIcon="+" component="label">
-              Folder
-              <input
-                hidden
-                type="file"
-                multiple
-                onChange={(e) => handleFolderSelect(e.target.files)}
-                {...({ webkitdirectory: "", directory: "" } as any)}
               />
             </Button>
           </Box>
@@ -158,7 +160,7 @@ export default function NotesSection({
                   )}
                 </Box>
 
-         
+
                 <ListItemText
                   primary={
                     <Link underline="none" color="inherit" noWrap>
@@ -168,7 +170,7 @@ export default function NotesSection({
                   secondary={note.description}
                 />
 
-     
+
                 <Box sx={{ width: 120, textAlign: "center" }}>
                   <Typography variant="body2">
                     {note.nextQuizDate}

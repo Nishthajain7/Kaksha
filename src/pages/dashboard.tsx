@@ -12,6 +12,7 @@ import {
   TextField,
   Button,
   Stack,
+  CardHeader,
 } from "@mui/material";
 import axios from "axios";
 
@@ -58,7 +59,6 @@ export default function Dashboard() {
     fetchDashboard();
   }, []);
 
-  /* Create folder (backend expects name only) */
   const handleCreateFolder = async () => {
     const name = newFolderName.trim();
     if (!name) return;
@@ -98,11 +98,8 @@ export default function Dashboard() {
         <Grid item xs={12} md={6}>
           {/* CREATE FOLDER */}
           <Card sx={{ mb: 2 }}>
+            <CardHeader title="Create New Folder"></CardHeader>
             <CardContent>
-              <Typography variant="h6" fontWeight={600} mb={1}>
-                Create New Folder
-              </Typography>
-
               <Stack direction="row" spacing={1}>
                 <TextField
                   label="Folder Name"
@@ -115,6 +112,7 @@ export default function Dashboard() {
                 />
                 <Button
                   variant="contained"
+                  size="small"
                   onClick={handleCreateFolder}
                   disabled={creating}
                 >
@@ -127,7 +125,7 @@ export default function Dashboard() {
           {/* FOLDERS LIST */}
           <NotesSection
             initialNotes={data?.folders || []}
-            onFolderClick={(id: number) => navigate(`/upload/${id}`)}
+            onFolderClick={(id) => navigate(`/upload/${id}`)}
           />
 
           {/* YOUTUBE CARD */}
@@ -149,7 +147,6 @@ export default function Dashboard() {
           </Card>
         </Grid>
 
-        {/* RIGHT SIDE – GOOGLE CALENDAR (UNCHANGED) */}
         <Grid item xs={12} md={6}>
           <Box
             sx={{

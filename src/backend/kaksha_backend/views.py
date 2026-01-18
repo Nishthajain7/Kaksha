@@ -7,6 +7,7 @@ from rest_framework.views import APIView
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
 from rest_framework import status
+from rich import _console
 from .models import Concept,File,Folder
 from googleapiclient.discovery import build
 from google.oauth2.credentials import Credentials
@@ -104,6 +105,9 @@ def fileUpload(request, folder_name):
                     file=new_file,
                     concept_name=name
                 )
+            
+            _console.log("Uploading to folder:", folderName);
+
 
             return Response({
                 "status": "success",
