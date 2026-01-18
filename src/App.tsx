@@ -3,9 +3,8 @@ import { ThemeProvider, CssBaseline, CircularProgress, Box } from "@mui/material
 import Dashboard from "./pages/dashboard";
 import SignIn from "./pages/auth";
 import theme from "./theme";
-import Quiz from "./pages/quiz";
 import File from "./pages/file"
-
+import Quiz from  "./pages/quiz/[id]";
 import axios from "axios";
 
 axios.defaults.baseURL = "http://localhost:8000";
@@ -17,7 +16,7 @@ axios.defaults.xsrfHeaderName = "X-CSRFToken";
 import { AuthProvider, useAuth } from "./Auth";
 import Auth from "./pages/auth";
 import { ProtectedRoute, PublicRoute } from "./RouteGuards";
-import Upload from "./pages/upload/[id]";
+import Upload from "./pages/upload/Upload";
 
 function AppRoutes() {
   const { loading } = useAuth();
@@ -62,10 +61,10 @@ function AppRoutes() {
       />
 
       <Route
-        path="/quiz"
+        path="/quiz/:id"
         element={
           <ProtectedRoute>
-            <Quiz />
+            {<Quiz />}
           </ProtectedRoute>
         }
       />

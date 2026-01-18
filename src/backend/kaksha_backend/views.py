@@ -22,6 +22,11 @@ from rest_framework.decorators import api_view, authentication_classes, permissi
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rich import _console
+from .serializers import OCRRequestSerializer
+from .serializers import KeyPointsRequestSerializer
+
+
 
 def auth(request):
     if request.user.is_authenticated:
@@ -56,7 +61,17 @@ def folderUpload(request, folder_name):
 import json
 from django.db import transaction
 
+class NewGateway(SessionAuthentication):
+    def enforce_csrf(self, request):
+        return
+
 @api_view(["POST"])
+@authentication_classes([NewGateway])
+@permission_classes([IsAuthenticated])
+
+
+
+
 def fileUpload(request, folder_name):
     if not request.user.is_authenticated:
         return Response({"error": "Login required"}, status=401)
@@ -81,16 +96,20 @@ def fileUpload(request, folder_name):
 
             # 2. Call OCRExtractView internally
             # We pass the current request which contains the 'file'
-            ocr_response = OCRExtractView.as_view()(request._request)
+            ocr_view = OCRExtractView()
+            ocr_view.request = request  # attach DRF request manually
+            ocr_response = ocr_view.post(request)
             if ocr_response.status_code != 200:
-                raise Exception("OCR Step Failed")
+                raise Exception(f"OCR failed: {ocr_response.data}")
             
             extracted_text = ocr_response.data.get("text")
 
             # 3. Call KeyPointsView internally
             # We must update the request data to pass the 'text' forward
             request.data['text'] = extracted_text
-            kp_response = KeyPointsView.as_view()(request._request)
+            kp_view = KeyPointsView()
+            kp_view.request = request
+            kp_response = kp_view.post(request)
             
             if kp_response.status_code != 200:
                 raise Exception("Concept Extraction Failed")
@@ -106,9 +125,9 @@ def fileUpload(request, folder_name):
                     concept_name=name
                 )
             
-            _console.log("Uploading to folder:", folderName);
 
-
+            print("FILES:", request.FILES)
+            print("DATA:", request.data)
             return Response({
                 "status": "success",
                 "file_id": new_file.file_id,
@@ -116,7 +135,8 @@ def fileUpload(request, folder_name):
             }, status=201)
 
     except Exception as e:
-        return Response({"error": str(e)}, status=500)
+        print("UPLOAD ERROR:", repr(e))
+        raise
 
 from django.utils import timezone
 from datetime import timedelta
@@ -215,6 +235,10 @@ OCR_URL = "https://api.ocr.space/parse/image"
 OCR_API = os.getenv("OCR_API")
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
+
+@method_decorator(csrf_exempt, name="dispatch")
 class OCRExtractView(APIView):
     parser_classes = (MultiPartParser, FormParser)
 
@@ -224,22 +248,20 @@ class OCRExtractView(APIView):
 
         file = serializer.validated_data["file"]
 
-        if not file.name.lower().endswith(".pdf"):
-            return Response(
-                {"detail": "Only PDF files are allowed"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
+        # ✅ READ FILE BYTES
         file_bytes = file.read()
+        file.seek(0)  # optional but safe
 
         response = requests.post(
             OCR_URL,
-            files={"file": (file.name, file_bytes, "application/pdf")},
+            files={
+                "file": (file.name, file_bytes, "application/pdf")
+            },
             data={
                 "apikey": OCR_API,
                 "language": "eng",
                 "isOverlayRequired": False,
-                "filetype": "PDF"
+                "filetype": "PDF",
             }
         )
 
@@ -319,7 +341,8 @@ Text:
                     "content": prompt
                 }
             ],
-            temperature=0.3
+            temperature=0.3,
+            response_format={"type":"json_object"},
         )
 
         key_points = response.choices[0].message.content

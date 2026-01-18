@@ -16,6 +16,11 @@ import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile";
 import { NoteItem } from "../assets/mockNotes";
 import { useState } from "react";
 import axios from "axios";
+import { useNavigate } from "react-router-dom";
+const navigate = useNavigate();
+
+
+
 
 type NotesSectionProps = CardProps & {
   title?: string;
@@ -26,7 +31,13 @@ type NotesSectionProps = CardProps & {
 
 type NoteWithDate = NoteItem & {
   nextQuizDate?: string;
+  meta?: {
+    fileId: number;
+    nextReview: string;
+    repetitions: number;
+  };
 };
+
 
 export default function NotesSection({
   initialNotes = [], folderName
